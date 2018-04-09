@@ -1,12 +1,32 @@
 #include "server_structs.c"
 
+void insert_by_algorithm(int id, int burst, int priority, int algorithm_type);
 void display();
 void append(int pid, int burst, int priority); //FCFS
 void insert_by_burst(int pid, int burst, int priority); //SJF
 void insert_by_priority(int pid, int burst, int priority); //HPF
-//struct PCB* remove(int pid);
+struct PCB* remove_head();
 
 struct PCB* head = NULL;
+
+void insert_by_algorithm(int id, int burst, int priority, int algorithm_type)
+{
+	switch(algorithm_type)
+	{
+		case 1:
+			append(id, burst, priority);
+			break;
+		case 2:
+			insert_by_burst(id, burst, priority);
+			break;
+		case 3:
+			insert_by_priority(id, burst, priority);
+			break;
+		case 4:
+			append(id, burst, priority);
+			break;
+	}
+}
 
 void display()
 {
@@ -93,7 +113,7 @@ void insert_by_burst(int id, int burst, int priority)
 
 void insert_by_priority(int id, int burst, int priority)
 {
-	struct PCB *current = head;
+	struct PCB *current;
     struct PCB *temp = head;
 
 	current = malloc(sizeof(struct PCB));
@@ -109,7 +129,7 @@ void insert_by_priority(int id, int burst, int priority)
 		head = current;
 	}
 
-	else if(priority < temp->priority)
+	else if(priority > head->priority)
 	{	
 		current->next = head;
 		head->previous = current;
@@ -119,7 +139,7 @@ void insert_by_priority(int id, int burst, int priority)
 	else
 	{
 		while(temp->next != NULL && 
-                    temp->next->priority < priority)
+                    temp->next->priority > priority)
         {
 			temp = temp->next;
         }
@@ -133,5 +153,31 @@ void insert_by_priority(int id, int burst, int priority)
 
 		temp->next = current;
 		current->previous = temp;
+	}
+}
+
+struct PCB* remove_head()
+{
+	if(head == NULL)
+	{
+		return NULL;
+	}
+
+	else
+	{
+		struct PCB *temp = head;
+
+		//Solo un elemento en la cola
+		if(temp->next == NULL)
+		{
+			head = NULL;
+		}
+
+		else
+		{
+			head = head->next;
+			head->previous = NULL;
+		}
+		return temp;
 	}
 }
