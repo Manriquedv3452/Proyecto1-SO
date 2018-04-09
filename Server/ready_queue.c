@@ -30,17 +30,18 @@ void insert_by_algorithm(int id, int burst, int priority, int algorithm_type)
 
 void display()
 {
+	printf("\n######################### Ready Queue #########################\n");
 	struct PCB *temp = head;
-	printf("\nMostrando Cola de Ready\n");
 
 	while(temp != NULL)
 	{
-		printf("PID: %d Burst: %d Prioridad: %d\n", 
+		printf("\nPID: %d Burst: %d Prioridad: %d\n", 
                 temp->pid, temp->burst, temp->priority);
 
 		temp = temp->next;
 	}
 
+	printf("\n###############################################################\n");
 }
 
 void append(int id, int burst, int priority)

@@ -21,17 +21,17 @@ void* job_scheduler();
 void* cpu_scheduler();
 void* manage_terminal();
 
+pthread_t t_cpu_scheduler;
+pthread_t t_job_scheduler;
+pthread_t t_manage_terminal;
+sem_t terminal_semaphore;
+int algorithm_type;
 int PID = 0;
+int quantum;
+int terminal_input;
 
 int main()
 {
-    pthread_t t_job_scheduler;
-    pthread_t t_cpu_scheduler;
-    pthread_t t_manage_terminal;
-    sem_t terminal_semaphore;
-    int algorithm_type;
-    int quantum;
-
     printf("\n1. First Come First Server\n");
     printf("2. Short Job First\n");
     printf("3. High Priority First\n");
@@ -45,12 +45,11 @@ int main()
         printf("\nHa seleccionado el Round Robin, ingrese el quantum a utilizar: ");
         scanf("%d", &quantum);
     }
-
     printf("\nEn cualquier usted puede presionar: \n");
-    printf("\n0 para mostrar la ready queue.\n");
-    printf("\n1 para detener el server y ver las estadisticas\n\n");
-    
-    sem_init(&terminal_semaphore, 0, 1);  //Semaphore Initialized 
+    printf("\n1 para mostrar la ready queue.\n");
+    printf("\n0 para detener el server y ver las estadisticas\n\n");
+
+    sem_init(&terminal_semaphore, 0, 1);
     pthread_create(&t_job_scheduler, NULL, (void*)job_scheduler, (void *)algorithm_type);
     pthread_create(&t_cpu_scheduler, NULL, (void*)cpu_scheduler, NULL);
     pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
@@ -127,12 +126,10 @@ void* job_scheduler(void *args)
     while(1)
     {
         client_socket = accept(server_socket, NULL, NULL);
-
-        printf("\nConexion con cliente #: %d\n", client_socket);
-            
+        
         //leer info del socket cliente
         read(client_socket, info_from_client, 20);
-        printf("\nCliente ha enviado: %s\n", info_from_client);
+        //printf("\nCliente %d ha enviado: %s\n", client_socket, info_from_client);
 
         char *burst    = malloc(5);
         char *priority = malloc(5);
@@ -166,19 +163,61 @@ void* job_scheduler(void *args)
 
         //free(burst);
         free(priority);
-
-        //mostrar la cola de ready
-        display();
         close(client_socket);
     }
+    pthread_exit(0);
 }
 
 void* cpu_scheduler(void* args)
 {
+    struct PCB* current_pcb;
+    current_pcb = remove_head();
 
+    while(1)
+    {
+        if(current_pcb != NULL)
+        {
+            //Simular la ejecucion del proceso
+            sleep(current_pcb->burst);
+            printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion\n", 
+                    current_pcb->pid, current_pcb->burst, current_pcb->priority);
+        }
+        current_pcb = remove_head();
+    }
+    pthread_exit(0);
 }
 
 void* manage_terminal(void* args)
 {
-    
+    while(1)
+    {
+        //si le escribo texto al scanf se jode
+		scanf("%d", &terminal_input);
+
+		//Mostrar ready queue
+		if(terminal_input == 1)				
+		{
+			sem_wait(&terminal_semaphore);
+			display();
+			sem_post(&terminal_semaphore);
+		}
+
+		//Se termina el server y se muestra el log
+		else if(terminal_input == 0)
+		{
+            //meter una bandera para saber cuando salir
+            //esa bandera iria en el los while(1)
+
+			sem_wait(&terminal_semaphore);
+
+			//mostra el log, falta los WT, TAT, etc
+
+			sem_post(&terminal_semaphore);
+			pthread_exit(0);
+		}
+		else 
+		{
+            
+		}
+	}
 }
