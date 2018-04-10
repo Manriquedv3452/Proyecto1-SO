@@ -1,29 +1,29 @@
 #include "server_structs.c"
 
-void insert_by_algorithm(int id, int burst, int priority, int algorithm_type);
+void insert_by_algorithm(int id, int burst, int priority, int algorithm_type, int TAT, int WT);
 void display();
-void append(int pid, int burst, int priority); //FCFS
-void insert_by_burst(int pid, int burst, int priority); //SJF
-void insert_by_priority(int pid, int burst, int priority); //HPF
+void append(int pid, int burst, int priority, int TAT, int WT); //FCFS
+void insert_by_SJF(int pid, int burst, int priority, int TAT, int WT); //SJF
+void insert_by_HPF(int pid, int burst, int priority, int TAT, int WT); //HPF
 struct PCB* remove_head();
 
 struct PCB* head = NULL;
 
-void insert_by_algorithm(int id, int burst, int priority, int algorithm_type)
+void insert_by_algorithm(int id, int burst, int priority, int algorithm_type, int TAT, int WT)
 {
 	switch(algorithm_type)
 	{
 		case 1:
-			append(id, burst, priority);
+			append(id, burst, priority, TAT, WT);
 			break;
 		case 2:
-			insert_by_burst(id, burst, priority);
+			insert_by_SJF(id, burst, priority, TAT, WT);
 			break;
 		case 3:
-			insert_by_priority(id, burst, priority);
+			insert_by_HPF(id, burst, priority, TAT, WT);
 			break;
 		case 4:
-			append(id, burst, priority);
+			append(id, burst, priority, TAT, WT);
 			break;
 	}
 }
@@ -44,16 +44,18 @@ void display()
 	printf("\n###############################################################\n");
 }
 
-void append(int id, int burst, int priority)
+void append(int id, int burst, int priority, int TAT, int WT)
 {
 	struct PCB *current = head;
     struct PCB *temp = head;
 
 	current = malloc(sizeof(struct PCB));
 	current = malloc(sizeof(struct PCB));
-	current->priority = priority;
-	current->burst = burst;
 	current->pid = id;
+	current->burst = burst;
+	current->priority = priority;
+	current->waiting_time = WT;
+	current->turn_around_time = TAT;
 	current->next = NULL;
 	current->previous = NULL;
 
@@ -71,7 +73,7 @@ void append(int id, int burst, int priority)
 	}
 }
 
-void insert_by_burst(int id, int burst, int priority)
+void insert_by_SJF(int id, int burst, int priority, int TAT, int WT)
 {
 	struct PCB *current = head;
     struct PCB *temp = head;
@@ -80,6 +82,8 @@ void insert_by_burst(int id, int burst, int priority)
 	current->pid = id;
 	current->burst = burst;
 	current->priority = priority;
+	current->waiting_time = WT;
+	current->turn_around_time = TAT;
 	current->previous = NULL;
 	current->next = NULL;
 
@@ -112,7 +116,7 @@ void insert_by_burst(int id, int burst, int priority)
 	}
 }
 
-void insert_by_priority(int id, int burst, int priority)
+void insert_by_HPF(int id, int burst, int priority, int TAT, int WT)
 {
 	struct PCB *current;
     struct PCB *temp = head;
@@ -121,6 +125,8 @@ void insert_by_priority(int id, int burst, int priority)
 	current->pid = id;
 	current->burst = burst;
 	current->priority = priority;
+	current->waiting_time = WT;
+	current->turn_around_time = TAT;
 	current->previous = NULL;
 	current->next = NULL;
 

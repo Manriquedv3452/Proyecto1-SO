@@ -36,12 +36,14 @@ int cpu_idle = 0;
 int execution_time = 0;
 int PID = 0;
 int quantum;
+int* turn_around_processes;
 int* waiting_time_processes;
-double average_time = 0.0;
+double average_waiting_time = 0.0;
 
 int main()
 {
     waiting_time_processes = calloc(1, sizeof(int));
+    turn_around_processes = calloc(1, sizeof(int));
     printf("\n1. First Come First Server\n");
     printf("2. Short Job First\n");
     printf("3. High Priority First\n");
@@ -111,7 +113,6 @@ void* job_scheduler(void *args)
     struct sockaddr_in server_address;
     pthread_t t_clients[CLIENTS_LIMIT];
     int server_socket;
-    //int client_socket;
     int algorithm_type = (int)args;
 
     //inicio y configuracion del server_socket
@@ -169,20 +170,22 @@ void* job_scheduler(void *args)
             agregar el PCB con la nueva info en la cola 
             de ready segun el algoritmo seleccionado
         */
-        insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type);
+        insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type, 0, 0);
         waiting_time_processes = realloc(waiting_time_processes, PID*sizeof(int));
+        turn_around_processes = realloc(turn_around_processes, PID*sizeof(int));
+        
         //free(burst);
         free(priority);
         close(client_socket);
     }
 
     pthread_exit(0);
-    exit(0);
 }
 
 void* cpu_scheduler(void* args)
 {
     struct PCB* current_pcb;
+    int quantum_time;
 
     while(alive)
     {
@@ -192,22 +195,56 @@ void* cpu_scheduler(void* args)
 
         if(current_pcb != NULL)
         {
-            printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion\n", 
+            waiting_time_processes[current_pcb->pid] = current_pcb->waiting_time;
+            turn_around_processes[current_pcb->pid] = current_pcb->turn_around_time;
+
+            if(algorithm_type != 4)
+            { 
+                printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion\n", 
                     current_pcb->pid, current_pcb->burst, current_pcb->priority);
 
-            //Simular la ejecucion del proceso
-            sleep(current_pcb->burst);
-            //printf("\nProceso con PID: %d Burst: %d Prioridad: %d ha terminado su ejecucion\n", 
-                    //current_pcb->pid, current_pcb->burst, current_pcb->priority);
+                sleep(current_pcb->burst); //Simular la ejecucion del proceso
 
-            //falta meter if de round robin
+                printf("\nProceso con PID: %d Burst: %d Prioridad: %d ha terminado su ejecucion\n", 
+                        current_pcb->pid, current_pcb->burst, current_pcb->priority);
 
-            waiting_time_processes[current_pcb->pid] = current_pcb->waiting_time;
+                turn_around_processes[current_pcb->pid] += current_pcb->burst;
+                turn_around_processes[current_pcb->pid] += 
+                                        waiting_time_processes[current_pcb->pid];
 
-            average_time += (double)current_pcb->waiting_time;
+            }
+            else
+            {
+                printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion. Quantum de %d\n", 
+                    current_pcb->pid, current_pcb->burst, current_pcb->priority, quantum);
+                
+                quantum_time = 0;
 
-            printf("\nWAITING TIME: %d\n", current_pcb->waiting_time);
-            printf("\nCPU IDLE TIME: %d\n", cpu_idle);
+                while(current_pcb->burst > 0 && quantum_time < quantum)
+                {
+                    current_pcb->burst--;
+                    quantum_time++;
+                    sleep(1);
+                }
+
+                current_pcb->turn_around_time += quantum_time;
+                turn_around_processes[current_pcb->pid] += quantum_time;
+
+                if(current_pcb->burst > 0)
+                {
+                    append(current_pcb->pid, current_pcb->burst, current_pcb->priority, 
+                        current_pcb->turn_around_time, current_pcb->waiting_time);
+                }
+                else
+                {
+                    current_pcb->turn_around_time += current_pcb->waiting_time;
+                    turn_around_processes[current_pcb->pid] = current_pcb->turn_around_time;
+                    printf("\nProceso con PID: %d Burst: %d Prioridad: %d ha terminado su ejecucion\n", 
+                            current_pcb->pid, current_pcb->burst, current_pcb->priority);
+
+                }
+            }
+
         }
         else
         {
@@ -240,18 +277,23 @@ void* manage_terminal(void* args)
             //esa bandera iria en el los while(1)
 
 			sem_wait(&terminal_semaphore);
+            printf("\n###################### RESULTADOS FINALES ######################\n");
+            printf("\nCANTIDAD DE PROCESOS: %d\n", PID);
+            printf("\nCPU IDLE TIME: %d\n", cpu_idle);
 
 			//mostra el log, falta los WT, TAT, etc
-            printf("Proceso \t waiting time\n");
+            printf("Proceso \t Waiting Time \tTurn Around Time\n");
             for(int i=0; i<PID; i++)
             {
-                printf("P%d\t\t %d\n", i, waiting_time_processes[i]);
+                printf("P%d\t\t %d\t\t%d\n", i, waiting_time_processes[i], turn_around_processes[i]);
+                average_waiting_time += waiting_time_processes[i];
             }
 
-            printf("\nAVERAGE WAITING TIME: %.2f\n", average_time/(double)(PID+1));
+            printf("\nPROMEDIO DE WAITING TIME: %.2f\n", average_waiting_time/(double)(PID));
+            printf("\n################################################################\n");
 
-			sem_post(&terminal_semaphore);
-            break;
+            sem_post(&terminal_semaphore);
+            pthread_exit(0);
 		}
 		else 
 		{
@@ -270,4 +312,34 @@ void* queue_time(void* args)
     }
 
     pthread_exit(0);
+}
+
+int is_numeric(char character)
+{
+	if (character >= 48 && character <= 57)
+		return 1;
+
+	return 0;
+}
+
+int verify_argument_experiment(char *argv[])
+{
+	char nString[10];
+	if (argv[1][0] == '-' && argv[1][1] == 'E' && argv[1][2] == '=')
+	{
+		int index = 0;
+		for (int i = 3; argv[1][i] != '\0'; i++)
+		{
+			if (!is_numeric(argv[1][i]))
+				return 0;
+
+			nString[index] = argv[1][i];
+			index++;
+
+			if (index == 10)
+				return 0;
+		}
+	}
+		
+	return atoi(nString);
 }
