@@ -4,4 +4,5 @@ struct PCB{
     int priority;
     struct PCB *previous;
 	struct PCB *next;
+    int waiting_time;
 };

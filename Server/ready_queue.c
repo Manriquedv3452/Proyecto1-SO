@@ -182,3 +182,14 @@ struct PCB* remove_head()
 		return temp;
 	}
 }
+
+void waiting_time(int time)
+{
+	struct PCB *temp = head;
+
+	while(temp != NULL)
+	{
+		temp->waiting_time += time;
+		temp = temp->next;
+	}
+}

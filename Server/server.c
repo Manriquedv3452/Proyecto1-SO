@@ -9,6 +9,7 @@
 #include <math.h>
 #include <string.h>
 #include <semaphore.h>
+#include <time.h>
 
 #include "ready_queue.c"
 
@@ -19,19 +20,28 @@ char* itoa(long n);
 char* concat(char* buffer, char c);
 void* job_scheduler();
 void* cpu_scheduler();
+void* queue_time();
 void* manage_terminal();
 
+clock_t begin;
+clock_t end;
 pthread_t t_cpu_scheduler;
 pthread_t t_job_scheduler;
 pthread_t t_manage_terminal;
+pthread_t t_queue_time;
 sem_t terminal_semaphore;
+int alive = 1;
 int algorithm_type;
+int cpu_idle = 0;
+int execution_time = 0;
 int PID = 0;
 int quantum;
-int terminal_input;
+int* waiting_time_processes;
+double average_time = 0.0;
 
 int main()
 {
+    waiting_time_processes = calloc(1, sizeof(int));
     printf("\n1. First Come First Server\n");
     printf("2. Short Job First\n");
     printf("3. High Priority First\n");
@@ -52,13 +62,14 @@ int main()
     sem_init(&terminal_semaphore, 0, 1);
     pthread_create(&t_job_scheduler, NULL, (void*)job_scheduler, (void *)algorithm_type);
     pthread_create(&t_cpu_scheduler, NULL, (void*)cpu_scheduler, NULL);
+    pthread_create(&t_queue_time, NULL, (void*)queue_time, NULL);
     pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
     
     pthread_join(t_job_scheduler, NULL);
     pthread_join(t_cpu_scheduler, NULL);
+    pthread_join(t_queue_time, NULL);
     pthread_join(t_manage_terminal, NULL);
-
-    sem_destroy(&terminal_semaphore);
+    sem_destroy(&terminal_semaphore);   
     return 0;
 }
 
@@ -100,7 +111,7 @@ void* job_scheduler(void *args)
     struct sockaddr_in server_address;
     pthread_t t_clients[CLIENTS_LIMIT];
     int server_socket;
-    int client_socket;
+    //int client_socket;
     int algorithm_type = (int)args;
 
     //inicio y configuracion del server_socket
@@ -116,20 +127,19 @@ void* job_scheduler(void *args)
     char info_from_client[20];
     int flag; //determinar cuando se toma el burst y cuando la prioridad
     int i;
-
     /*
         Poner a la escucha al socket
         Hasta 20 conexiones de cliente en cola
     */
     listen(server_socket, 20);
 
-    while(1)
+    while(alive)
     {
-        client_socket = accept(server_socket, NULL, NULL);
+        int client_socket = accept(server_socket, NULL, NULL);
         
         //leer info del socket cliente
-        read(client_socket, info_from_client, 20);
-        //printf("\nCliente %d ha enviado: %s\n", client_socket, info_from_client);
+        //read(client_socket, info_from_client, 20);
+        recv(client_socket, info_from_client, 20, 0);
 
         char *burst    = malloc(5);
         char *priority = malloc(5);
@@ -151,7 +161,7 @@ void* job_scheduler(void *args)
 
             i++;
         }
-            
+
         //enviar respuesta al cliente: el PID
         send(client_socket, itoa(PID), sizeof(PID), 0);
 
@@ -160,50 +170,71 @@ void* job_scheduler(void *args)
             de ready segun el algoritmo seleccionado
         */
         insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type);
-
+        waiting_time_processes = realloc(waiting_time_processes, PID*sizeof(int));
         //free(burst);
         free(priority);
         close(client_socket);
     }
+
     pthread_exit(0);
+    exit(0);
 }
 
 void* cpu_scheduler(void* args)
 {
     struct PCB* current_pcb;
-    current_pcb = remove_head();
 
-    while(1)
+    while(alive)
     {
+        //funcion para recorrer cola
+
+        current_pcb = remove_head();
+
         if(current_pcb != NULL)
         {
-            //Simular la ejecucion del proceso
-            sleep(current_pcb->burst);
             printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion\n", 
                     current_pcb->pid, current_pcb->burst, current_pcb->priority);
+
+            //Simular la ejecucion del proceso
+            sleep(current_pcb->burst);
+            //printf("\nProceso con PID: %d Burst: %d Prioridad: %d ha terminado su ejecucion\n", 
+                    //current_pcb->pid, current_pcb->burst, current_pcb->priority);
+
+            //falta meter if de round robin
+
+            waiting_time_processes[current_pcb->pid] = current_pcb->waiting_time;
+
+            average_time += (double)current_pcb->waiting_time;
+
+            printf("\nWAITING TIME: %d\n", current_pcb->waiting_time);
+            printf("\nCPU IDLE TIME: %d\n", cpu_idle);
         }
-        current_pcb = remove_head();
+        else
+        {
+            sleep(1);
+            cpu_idle++;
+        }
     }
     pthread_exit(0);
 }
 
 void* manage_terminal(void* args)
 {
-    while(1)
+    while(alive)
     {
         //si le escribo texto al scanf se jode
-		scanf("%d", &terminal_input);
+		scanf("%d", &alive);
 
 		//Mostrar ready queue
-		if(terminal_input == 1)				
+		if(alive == 1)				
 		{
 			sem_wait(&terminal_semaphore);
-			display();
+			display(); //queue
 			sem_post(&terminal_semaphore);
 		}
 
 		//Se termina el server y se muestra el log
-		else if(terminal_input == 0)
+		else if(alive == 0)
 		{
             //meter una bandera para saber cuando salir
             //esa bandera iria en el los while(1)
@@ -211,13 +242,32 @@ void* manage_terminal(void* args)
 			sem_wait(&terminal_semaphore);
 
 			//mostra el log, falta los WT, TAT, etc
+            printf("Proceso \t waiting time\n");
+            for(int i=0; i<PID; i++)
+            {
+                printf("P%d\t\t %d\n", i, waiting_time_processes[i]);
+            }
+
+            printf("\nAVERAGE WAITING TIME: %.2f\n", average_time/(double)(PID+1));
 
 			sem_post(&terminal_semaphore);
-			pthread_exit(0);
+            break;
 		}
 		else 
 		{
             
 		}
 	}
+    pthread_exit(0);
+}
+
+void* queue_time(void* args)
+{
+    while(alive)
+    {
+        waiting_time(1);
+        sleep(1);
+    }
+
+    pthread_exit(0);
 }
