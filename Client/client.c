@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <math.h>
+#include <semaphore.h>
 
 #include "client_structs.c"
 
@@ -20,6 +21,7 @@ void execution_instruction();
 char* itoa(long n);
 char *concat(char *buffer, char c);
 void send_pcb_server(struct PCB* pcb);
+void* manage_terminal(void* args);
 
 pthread_t threads[THREADS_LIMIT];
 pthread_t t_manage_terminal;
@@ -108,12 +110,13 @@ int main(int argc, char** argv)
         int min_sleep;
         int max_sleep;
 
-        printf("\nSe ha ejecutado el cliente automatico\n\n");
+        printf("\nSe ha ejecutado el cliente automatico.\n\n");
         printf("Ingrese el valor minimo del sleep para creacion de procesos: ");
         scanf("%d", &min_sleep);
         printf("Ingrese el valor maximo del sleep para creacion de procesos: ");
         scanf("%d", &max_sleep);
-
+        
+        printf("\nPuede detener la creacion de procesos tecleando 0\n\n");
         pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
         
         while(alive == 1)
@@ -124,6 +127,8 @@ int main(int argc, char** argv)
             //sleep que se indica en la especificacion de la tarea
             sleep(rand() % (max_sleep - min_sleep + 1) + min_sleep);
         }
+
+        pthread_join(t_manage_terminal,NULL);
     }
     else
     {
@@ -220,29 +225,18 @@ void* manage_terminal(void* args)
 {
     while(alive == 1)
     {
-        //si le escribo texto al scanf se jode
 		scanf("%d", &alive);
 
-		//Mostrar ready queue
 		if(alive == 1)				
 		{
 			sem_wait(&terminal_semaphore);
-			display(); //queue
-			sem_post(&terminal_semaphore);
-			alive = 2;
-		}
-
-		//Se termina el server y se muestra el log
-		else if(alive == 0)
-		{
-            sem_wait(&terminal_semaphore);
             sem_post(&terminal_semaphore);
             pthread_exit(0);
 		}
+
 		else 
 		{
             
 		}
 	}
-    pthread_exit(0);
 }

@@ -174,6 +174,10 @@ void* job_scheduler(void *args)
                 i++;
             }
 
+            //enviar respuesta al cliente: el PID
+            send(client_socket, itoa(PID), sizeof(PID), 0);
+            close(client_socket);
+
             /*
                 agregar el PCB con la nueva info en la cola 
                 de ready segun el algoritmo seleccionado
@@ -181,10 +185,6 @@ void* job_scheduler(void *args)
             insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type, 0, 0);
             waiting_time_processes = realloc(waiting_time_processes, PID*sizeof(int));
             turn_around_processes = realloc(turn_around_processes, PID*sizeof(int));
-
-            //enviar respuesta al cliente: el PID
-            send(client_socket, itoa(PID), sizeof(PID), 0);
-            close(client_socket);
         }
         else
         {
@@ -275,7 +275,6 @@ void* manage_terminal(void* args)
 {
     while(alive == 1)
     {
-        //si le escribo texto al scanf se jode
 		scanf("%d", &alive);
 
 		//Mostrar ready queue
