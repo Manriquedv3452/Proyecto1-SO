@@ -22,6 +22,7 @@ char* itoa(long n);
 char *concat(char *buffer, char c);
 void send_pcb_server(struct PCB* pcb);
 void* manage_terminal(void* args);
+void clean_buffer(void);
 
 pthread_t threads[THREADS_LIMIT];
 pthread_t t_manage_terminal;
@@ -35,11 +36,14 @@ int main(int argc, char** argv)
     int min_burst;
     int max_burst;
 
-    printf("\nSe ha ejecutado el cliente automatico\n\n");
+    printf("\nSe ha ejecutado el cliente\n\n");
     printf("Ingrese el valor minimo del burst: ");
     scanf("%d", &min_burst);
+    clean_buffer();
+
     printf("Ingrese el valor maximo del burst: ");
     scanf("%d", &max_burst);
+    clean_buffer();
 
     if(argc == 2)
     {
@@ -113,8 +117,11 @@ int main(int argc, char** argv)
         printf("\nSe ha ejecutado el cliente automatico.\n\n");
         printf("Ingrese el valor minimo del sleep para creacion de procesos: ");
         scanf("%d", &min_sleep);
+	clean_buffer();
+
         printf("Ingrese el valor maximo del sleep para creacion de procesos: ");
         scanf("%d", &max_sleep);
+	clean_buffer();
         
         printf("\nPuede detener la creacion de procesos tecleando 0\n\n");
         pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
@@ -226,6 +233,7 @@ void* manage_terminal(void* args)
     while(alive == 1)
     {
 		scanf("%d", &alive);
+		clean_buffer();
 
 		if(alive == 1)				
 		{
@@ -239,4 +247,11 @@ void* manage_terminal(void* args)
             
 		}
 	}
+}
+
+
+void clean_buffer(void)
+{
+    int n;
+    while((n = getchar()) != EOF && n != '\n' );
 }

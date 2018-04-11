@@ -22,6 +22,7 @@ void* job_scheduler();
 void* cpu_scheduler();
 void* queue_time();
 void* manage_terminal();
+void clean_buffer(void);
 
 clock_t begin;
 clock_t end;
@@ -51,14 +52,22 @@ int main()
     printf("0. Salir\n");
     printf("\nIngrese el tipo de algoritmo de planificacion a utilizar: ");
     scanf("%d", &algorithm_type);
+    clean_buffer();
     
     if (algorithm_type == 4)
     {
         printf("\nHa seleccionado el Round Robin, ingrese el quantum a utilizar: ");
         scanf("%d", &quantum);
+	clean_buffer();
+	if (quantum == 0)
+	{
+		printf("\n\nQuantum No valido\n\n");
+		printf("\n###################### Fin de Ejecucion del Server ######################\n\n");
+    		return 0;
+	}
     }
 
-    else if (algorithm_type != 0)
+    if (algorithm_type != 0)
     {
         printf("\nEn cualquier usted puede presionar: \n");
         printf("\n1 para mostrar la ready queue.\n");
@@ -276,6 +285,7 @@ void* manage_terminal(void* args)
     while(alive == 1)
     {
 		scanf("%d", &alive);
+		clean_buffer();
 
 		//Mostrar ready queue
 		if(alive == 1)				
@@ -323,4 +333,10 @@ void* queue_time(void* args)
     }
 
     pthread_exit(0);
+}
+
+void clean_buffer(void)
+{
+    int n;
+    while((n = getchar()) != EOF && n != '\n' );
 }
