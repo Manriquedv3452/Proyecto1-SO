@@ -287,6 +287,9 @@ void* manage_terminal(void* args)
 		scanf("%d", &alive);
 		clean_buffer();
 
+		if (alive != 1 && alive != 0)
+			alive = 1;
+
 		//Mostrar ready queue
 		if(alive == 1)				
 		{

@@ -45,6 +45,12 @@ int main(int argc, char** argv)
     scanf("%d", &max_burst);
     clean_buffer();
 
+	if (min_burst <= 0 && max_burst <= 0)
+	{
+		min_burst = 1;
+		max_burst = 2;
+	}
+
     if(argc == 2)
     {
         printf("\nSe ha ejecutado el cliente manual\n\n");
@@ -122,6 +128,12 @@ int main(int argc, char** argv)
         printf("Ingrese el valor maximo del sleep para creacion de procesos: ");
         scanf("%d", &max_sleep);
 	clean_buffer();
+
+	if (min_sleep <= 0 && max_sleep <= 0)
+	{
+		min_sleep = 1;
+		max_sleep = 2;
+	}
         
         printf("\nPuede detener la creacion de procesos tecleando 0\n\n");
         pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
@@ -234,6 +246,9 @@ void* manage_terminal(void* args)
     {
 		scanf("%d", &alive);
 		clean_buffer();
+
+		if (alive != 1 && alive != 0)
+			alive = 1;
 
 		if(alive == 1)				
 		{
