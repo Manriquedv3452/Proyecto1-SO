@@ -44,34 +44,45 @@ int main()
 {
     waiting_time_processes = calloc(1, sizeof(int));
     turn_around_processes = calloc(1, sizeof(int));
-    printf("\n1. First Come First Server\n");
+    printf("\n1. First Come First Serve\n");
     printf("2. Short Job First\n");
     printf("3. High Priority First\n");
     printf("4. Round Robin\n");
     printf("0. Salir\n");
     printf("\nIngrese el tipo de algoritmo de planificacion a utilizar: ");
     scanf("%d", &algorithm_type);
-
+    
     if (algorithm_type == 4)
     {
         printf("\nHa seleccionado el Round Robin, ingrese el quantum a utilizar: ");
         scanf("%d", &quantum);
     }
-    printf("\nEn cualquier usted puede presionar: \n");
-    printf("\n1 para mostrar la ready queue.\n");
-    printf("\n0 para detener el server y ver las estadisticas\n\n");
 
-    sem_init(&terminal_semaphore, 0, 1);
-    pthread_create(&t_job_scheduler, NULL, (void*)job_scheduler, (void *)algorithm_type);
-    pthread_create(&t_cpu_scheduler, NULL, (void*)cpu_scheduler, NULL);
-    pthread_create(&t_queue_time, NULL, (void*)queue_time, NULL);
-    pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
+    else if (algorithm_type != 0)
+    {
+        printf("\nEn cualquier usted puede presionar: \n");
+        printf("\n1 para mostrar la ready queue.\n");
+        printf("\n0 para detener el server y ver las estadisticas\n\n");
+
+        sem_init(&terminal_semaphore, 0, 1);
+        pthread_create(&t_job_scheduler, NULL, (void*)job_scheduler, (void *)algorithm_type);
+        pthread_create(&t_cpu_scheduler, NULL, (void*)cpu_scheduler, NULL);
+        pthread_create(&t_queue_time, NULL, (void*)queue_time, NULL);
+        pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
+        
+        pthread_join(t_job_scheduler, NULL);
+        pthread_join(t_cpu_scheduler, NULL);
+        pthread_join(t_queue_time, NULL);
+        pthread_join(t_manage_terminal,NULL);
+        sem_destroy(&terminal_semaphore); 
+    }
     
-    pthread_join(t_job_scheduler, NULL);
-    pthread_join(t_cpu_scheduler, NULL);
-    pthread_join(t_queue_time, NULL);
-    pthread_join(t_manage_terminal, NULL);
-    sem_destroy(&terminal_semaphore);   
+    else
+    {
+        printf("\n\nOpcion No Valida\n\n");
+    }
+
+    printf("\n###################### Fin de Ejecucion del Server ######################\n\n");
     return 0;
 }
 
@@ -112,11 +123,10 @@ void* job_scheduler(void *args)
 {
     struct sockaddr_in server_address;
     pthread_t t_clients[CLIENTS_LIMIT];
-    int server_socket;
     int algorithm_type = (int)args;
 
     //inicio y configuracion del server_socket
-    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
     server_address.sin_port = PORT;
@@ -137,48 +147,52 @@ void* job_scheduler(void *args)
     while(alive)
     {
         int client_socket = accept(server_socket, NULL, NULL);
-        
-        //leer info del socket cliente
-        //read(client_socket, info_from_client, 20);
-        recv(client_socket, info_from_client, 20, 0);
 
-        char *burst    = malloc(5);
-        char *priority = malloc(5);
-        i = 0;
-        flag = 0;
+        if(client_socket != -1){
+            //leer info del socket cliente
+            //read(client_socket, info_from_client, 20);
+            recv(client_socket, info_from_client, 20, 0);
 
-        //desformatear el mensaje del cliente B/P
-        while(info_from_client[i] != '\0')
-        {
-            char current_char = info_from_client[i];
+            char *burst    = calloc(1, sizeof(char));
+            char *priority = calloc(1, sizeof(char));
+            i = 0;
+            flag = 0;
 
-            if (current_char == '/') flag = 1;
-
-            else
+            //desformatear el mensaje del cliente B/P
+            while(info_from_client[i] != '\0')
             {
-                if(flag == 0) concat(burst, current_char);
-                if(flag == 1) concat(priority, current_char);
+                char current_char = info_from_client[i];
+
+                if (current_char == '/') flag = 1;
+
+                else
+                {
+                    if(flag == 0) concat(burst, current_char);
+                    if(flag == 1) concat(priority, current_char);
+                }
+
+                i++;
             }
 
-            i++;
+            /*
+                agregar el PCB con la nueva info en la cola 
+                de ready segun el algoritmo seleccionado
+            */
+            insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type, 0, 0);
+            waiting_time_processes = realloc(waiting_time_processes, PID*sizeof(int));
+            turn_around_processes = realloc(turn_around_processes, PID*sizeof(int));
+
+            //enviar respuesta al cliente: el PID
+            send(client_socket, itoa(PID), sizeof(PID), 0);
+            close(client_socket);
         }
-
-        //enviar respuesta al cliente: el PID
-        send(client_socket, itoa(PID), sizeof(PID), 0);
-
-        /*
-            agregar el PCB con la nueva info en la cola 
-            de ready segun el algoritmo seleccionado
-        */
-        insert_by_algorithm(PID++, atoi(burst), atoi(priority), algorithm_type, 0, 0);
-        waiting_time_processes = realloc(waiting_time_processes, PID*sizeof(int));
-        turn_around_processes = realloc(turn_around_processes, PID*sizeof(int));
+        else
+        {
+            break;
+        }
         
-        //free(burst);
-        free(priority);
-        close(client_socket);
     }
-
+    exit(0);
     pthread_exit(0);
 }
 
@@ -200,7 +214,7 @@ void* cpu_scheduler(void* args)
 
             if(algorithm_type != 4)
             { 
-                printf("\nProceso con PID: %d Burst: %d Prioridad: %d entran en ejecucion\n", 
+                printf("\nProceso con PID: %d Burst: %d Prioridad: %d entra en ejecucion\n", 
                     current_pcb->pid, current_pcb->burst, current_pcb->priority);
 
                 sleep(current_pcb->burst); //Simular la ejecucion del proceso
@@ -232,6 +246,7 @@ void* cpu_scheduler(void* args)
 
                 if(current_pcb->burst > 0)
                 {
+                    //el proceso no ha terminado, reingresa a la cola
                     append(current_pcb->pid, current_pcb->burst, current_pcb->priority, 
                         current_pcb->turn_around_time, current_pcb->waiting_time);
                 }
@@ -252,12 +267,13 @@ void* cpu_scheduler(void* args)
             cpu_idle++;
         }
     }
+    
     pthread_exit(0);
 }
 
 void* manage_terminal(void* args)
 {
-    while(alive)
+    while(alive == 1)
     {
         //si le escribo texto al scanf se jode
 		scanf("%d", &alive);
@@ -273,25 +289,22 @@ void* manage_terminal(void* args)
 		//Se termina el server y se muestra el log
 		else if(alive == 0)
 		{
-            //meter una bandera para saber cuando salir
-            //esa bandera iria en el los while(1)
-
-			sem_wait(&terminal_semaphore);
+            sem_wait(&terminal_semaphore);
             printf("\n###################### RESULTADOS FINALES ######################\n");
-            printf("\nCANTIDAD DE PROCESOS: %d\n", PID);
-            printf("\nCPU IDLE TIME: %d\n", cpu_idle);
+            printf("\nCANTIDAD DE PROCESOS: \t%d\n", PID);
+            printf("\nCPU IDLE TIME: \t%d\n", cpu_idle);
 
 			//mostra el log, falta los WT, TAT, etc
-            printf("Proceso \t Waiting Time \tTurn Around Time\n");
+            printf("\nProceso \t Waiting Time \tTurn Around Time\n");
             for(int i=0; i<PID; i++)
             {
                 printf("P%d\t\t %d\t\t%d\n", i, waiting_time_processes[i], turn_around_processes[i]);
                 average_waiting_time += waiting_time_processes[i];
             }
 
-            printf("\nPROMEDIO DE WAITING TIME: %.2f\n", average_waiting_time/(double)(PID));
+            printf("\nPROMEDIO DE WAITING TIME: \t%.2f\n", average_waiting_time/(double)(PID));
             printf("\n################################################################\n");
-
+            pthread_cancel(t_job_scheduler);
             sem_post(&terminal_semaphore);
             pthread_exit(0);
 		}
@@ -300,7 +313,6 @@ void* manage_terminal(void* args)
             
 		}
 	}
-    pthread_exit(0);
 }
 
 void* queue_time(void* args)
@@ -312,34 +324,4 @@ void* queue_time(void* args)
     }
 
     pthread_exit(0);
-}
-
-int is_numeric(char character)
-{
-	if (character >= 48 && character <= 57)
-		return 1;
-
-	return 0;
-}
-
-int verify_argument_experiment(char *argv[])
-{
-	char nString[10];
-	if (argv[1][0] == '-' && argv[1][1] == 'E' && argv[1][2] == '=')
-	{
-		int index = 0;
-		for (int i = 3; argv[1][i] != '\0'; i++)
-		{
-			if (!is_numeric(argv[1][i]))
-				return 0;
-
-			nString[index] = argv[1][i];
-			index++;
-
-			if (index == 10)
-				return 0;
-		}
-	}
-		
-	return atoi(nString);
 }

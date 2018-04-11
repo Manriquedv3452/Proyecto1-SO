@@ -3,8 +3,8 @@
 void insert_by_algorithm(int id, int burst, int priority, int algorithm_type, int TAT, int WT);
 void display();
 void append(int pid, int burst, int priority, int TAT, int WT); //FCFS
-void insert_by_SJF(int pid, int burst, int priority, int TAT, int WT); //SJF
-void insert_by_HPF(int pid, int burst, int priority, int TAT, int WT); //HPF
+void short_job_first(int pid, int burst, int priority, int TAT, int WT); //short_job_first
+void high_priority_first(int pid, int burst, int priority, int TAT, int WT); //high_priority_first
 struct PCB* remove_head();
 
 struct PCB* head = NULL;
@@ -14,16 +14,14 @@ void insert_by_algorithm(int id, int burst, int priority, int algorithm_type, in
 	switch(algorithm_type)
 	{
 		case 1:
+		case 4:
 			append(id, burst, priority, TAT, WT);
 			break;
 		case 2:
-			insert_by_SJF(id, burst, priority, TAT, WT);
+			short_job_first(id, burst, priority, TAT, WT);
 			break;
 		case 3:
-			insert_by_HPF(id, burst, priority, TAT, WT);
-			break;
-		case 4:
-			append(id, burst, priority, TAT, WT);
+			high_priority_first(id, burst, priority, TAT, WT);
 			break;
 	}
 }
@@ -35,8 +33,8 @@ void display()
 
 	while(temp != NULL)
 	{
-		printf("\nPID: %d Burst: %d Prioridad: %d\n", 
-                temp->pid, temp->burst, temp->priority);
+		printf("\nPID: %d Burst: %d Prioridad: %d WT: %d TAT:%d\n", 
+                temp->pid, temp->burst, temp->priority, temp->waiting_time, temp->turn_around_time);
 
 		temp = temp->next;
 	}
@@ -49,8 +47,7 @@ void append(int id, int burst, int priority, int TAT, int WT)
 	struct PCB *current = head;
     struct PCB *temp = head;
 
-	current = malloc(sizeof(struct PCB));
-	current = malloc(sizeof(struct PCB));
+	current = calloc(1, sizeof(struct PCB));
 	current->pid = id;
 	current->burst = burst;
 	current->priority = priority;
@@ -73,12 +70,12 @@ void append(int id, int burst, int priority, int TAT, int WT)
 	}
 }
 
-void insert_by_SJF(int id, int burst, int priority, int TAT, int WT)
+void short_job_first(int id, int burst, int priority, int TAT, int WT)
 {
 	struct PCB *current = head;
     struct PCB *temp = head;
 
-	current = malloc(sizeof(struct PCB));
+	current = calloc(1, sizeof(struct PCB));
 	current->pid = id;
 	current->burst = burst;
 	current->priority = priority;
@@ -116,12 +113,12 @@ void insert_by_SJF(int id, int burst, int priority, int TAT, int WT)
 	}
 }
 
-void insert_by_HPF(int id, int burst, int priority, int TAT, int WT)
+void high_priority_first(int id, int burst, int priority, int TAT, int WT)
 {
 	struct PCB *current;
     struct PCB *temp = head;
 
-	current = malloc(sizeof(struct PCB));
+	current = calloc(1, sizeof(struct PCB));
 	current->pid = id;
 	current->burst = burst;
 	current->priority = priority;

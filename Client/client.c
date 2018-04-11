@@ -21,13 +21,24 @@ char* itoa(long n);
 char *concat(char *buffer, char c);
 void send_pcb_server(struct PCB* pcb);
 
-
 pthread_t threads[THREADS_LIMIT];
+pthread_t t_manage_terminal;
+sem_t terminal_semaphore;
 int thread_index = 0;
+int alive = 1;
 //srand(time(0));
 
 int main(int argc, char** argv)
 {
+    int min_burst;
+    int max_burst;
+
+    printf("\nSe ha ejecutado el cliente automatico\n\n");
+    printf("Ingrese el valor minimo del burst: ");
+    scanf("%d", &min_burst);
+    printf("Ingrese el valor maximo del burst: ");
+    scanf("%d", &max_burst);
+
     if(argc == 2)
     {
         printf("\nSe ha ejecutado el cliente manual\n\n");
@@ -44,8 +55,8 @@ int main(int argc, char** argv)
         while (feof(input_file) == 0)
         {
             fgets(line, LINE_LEN, input_file);
-            char *burst    = malloc(3);
-            char *priority = malloc(3);
+            char *burst = calloc(1, sizeof(char));
+            char *priority = calloc(1, sizeof(char));
             int i = 0;
             int flag = 0;
 
@@ -67,13 +78,23 @@ int main(int argc, char** argv)
             }
 
             //prioridad por default
-            if(priority == ' ') priority = "5";
+            if(priority[0] == ' ') priority[0] = 5;
             
-            struct PCB new_pcb = {atoi(burst), atoi(priority)};
-            pthread_create(&threads[thread_index], NULL, (void*)send_pcb_server, (void*)&new_pcb);
-            thread_index++;
-            //sleep que se indica en la especificacion de la tarea
-            sleep(rand() % (8 - 3 + 1) + 3);
+            if(atoi(burst) >= min_burst && atoi(burst) <= max_burst)
+            {
+                struct PCB new_pcb = {atoi(burst), atoi(priority)};
+                pthread_create(&threads[thread_index], NULL, (void*)send_pcb_server, (void*)&new_pcb);
+                thread_index++;
+                //sleep que se indica en la especificacion de la tarea
+                sleep(rand() % (8 - 3 + 1) + 3);
+            }
+            else
+            {
+                printf("\nLos datos de burst: %d y prioridad: %d no cumplen con los datos indicados\n", atoi(burst), atoi(priority));
+                printf("Min burst: %d y Max burst: %d\n", min_burst, max_burst);
+                printf("Min prioridad: 1 y Max prioridad: 10\n");
+            }
+            
         }
 
         //sincronizar los procesos
@@ -84,24 +105,20 @@ int main(int argc, char** argv)
 
     else if(argc == 1)
     {
-        int min_burst;
-        int max_burst;
         int min_sleep;
         int max_sleep;
 
         printf("\nSe ha ejecutado el cliente automatico\n\n");
-        printf("Ingrese el valor minimo del burst: ");
-        scanf("%d", &min_burst);
-        printf("Ingrese el valor maximo del burst: ");
-        scanf("%d", &max_burst);
         printf("Ingrese el valor minimo del sleep para creacion de procesos: ");
         scanf("%d", &min_sleep);
         printf("Ingrese el valor maximo del sleep para creacion de procesos: ");
         scanf("%d", &max_sleep);
 
-        while(1)
+        pthread_create(&t_manage_terminal, NULL, (void*)manage_terminal, NULL);
+        
+        while(alive == 1)
         {
-            struct PCB new_pcb = {rand() % (max_burst - min_burst + 1) + min_burst, rand() % 11};
+            struct PCB new_pcb = {rand() % (max_burst - min_burst + 1) + min_burst, rand() % 10 + 1};
             pthread_create(&threads[thread_index], NULL, (void*)send_pcb_server, (void*)&new_pcb);
             thread_index++;
             //sleep que se indica en la especificacion de la tarea
@@ -110,7 +127,6 @@ int main(int argc, char** argv)
     }
     else
     {
-        printf("\nError: Parametros no coinciden con los tipos de cliente manual o automatico\n");
         execution_instruction();
     }
 
@@ -119,6 +135,7 @@ int main(int argc, char** argv)
 
 void execution_instruction()
 {
+    printf("\nError: Parametros no coinciden con los tipos de cliente manual o automatico\n");
     printf("Cliente Manual: ./client procesos.txt\n");
     printf("Cliente Automatico: ./client\n\n");
 }
@@ -187,9 +204,7 @@ void send_pcb_server(struct PCB* pcb)
         char server_response[15];
         recv(client_socket, &server_response, sizeof(server_response), 0);
         printf("Respuesta del Server: %s\n", server_response);
-        //free(char*)
         close(client_socket);
-        //exit(0);
     }
 
     else
@@ -198,5 +213,36 @@ void send_pcb_server(struct PCB* pcb)
         printf("\nVerifique si el server se ha iniciado.\n");
     }
 
+    pthread_exit(0);
+}
+
+void* manage_terminal(void* args)
+{
+    while(alive == 1)
+    {
+        //si le escribo texto al scanf se jode
+		scanf("%d", &alive);
+
+		//Mostrar ready queue
+		if(alive == 1)				
+		{
+			sem_wait(&terminal_semaphore);
+			display(); //queue
+			sem_post(&terminal_semaphore);
+			alive = 2;
+		}
+
+		//Se termina el server y se muestra el log
+		else if(alive == 0)
+		{
+            sem_wait(&terminal_semaphore);
+            sem_post(&terminal_semaphore);
+            pthread_exit(0);
+		}
+		else 
+		{
+            
+		}
+	}
     pthread_exit(0);
 }
